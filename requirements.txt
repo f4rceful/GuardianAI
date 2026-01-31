@@ -1,0 +1,9 @@
+scikit-learn
+nltk
+numpy
+pandas
+flet
+joblib
+torch
+transformers
+sentencepiece

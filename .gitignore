@@ -1,0 +1,9 @@
+.idea/
+__pycache__/
+*.pyc
+venv/
+.env
+*.log
+# Exclude datasets if too large, but we decided to keep them if under limit.
+# GitHub limit is 100MB per file. Our files are small.
+# dataset/phishing_dataset_50000.txt # Included

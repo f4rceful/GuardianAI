@@ -1,0 +1,442 @@
+[
+    {
+        "text": "СРОЧНО мама я попал в аварию переведи деньги на карту 2288 0044 2923 3030",
+        "is_scam": true,
+        "triggers": [
+            "срочно"
+        ],
+        "ml_score": 0.3,
+        "ml_verdict": "Safe",
+        "reason": "Keyword Trigger",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "entities": {
+            "RELATIVE": [
+                "мам"
+            ],
+            "FINANCE": [
+                "карт[а-ы]"
+            ],
+            "URGENCY": [
+                "срочно"
+            ]
+        },
+        "timestamp": "2026-01-31T20:01:00.567614"
+    },
+    {
+        "text": "Инвестируй 1000р и получи 100000р уже на следующей недели...",
+        "is_scam": false,
+        "triggers": [],
+        "ml_score": 0.17,
+        "ml_verdict": "Safe",
+        "reason": "Safe",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "entities": {},
+        "timestamp": "2026-01-31T20:00:31.686714"
+    },
+    {
+        "text": "Мама привет это я твой сын переведи мне 2000р. СРОЧНО!!!",
+        "is_scam": true,
+        "triggers": [
+            "срочно"
+        ],
+        "ml_score": 1.0,
+        "ml_verdict": "Scam",
+        "reason": "Keyword Trigger",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "entities": {
+            "RELATIVE": [
+                "мам"
+            ],
+            "URGENCY": [
+                "срочно"
+            ]
+        },
+        "timestamp": "2026-01-31T19:05:55.191965"
+    },
+    {
+        "text": "Ваш код для входа в квартиру 9009",
+        "is_scam": false,
+        "triggers": [],
+        "ml_score": 0.0,
+        "ml_verdict": "Safe",
+        "reason": "Safe (System Message)",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T18:42:53.024164"
+    },
+    {
+        "text": "Ваш автоплатеж за интернет успешно выполнен. Списано 600 руб.",
+        "is_scam": false,
+        "triggers": [],
+        "ml_score": 0.0,
+        "ml_verdict": "Safe",
+        "reason": "Safe",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T18:42:27.663472"
+    },
+    {
+        "text": "Напоминание: завтра крайний срок, чтобы перевести деньги за аренду квартиры",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 1.0,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T18:42:12.060307"
+    },
+    {
+        "text": "Привет, это курьер. Скажите, пожалуйста, код от домофона, не могу попасть в подъезд.",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.8712,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:17:18.662637"
+    },
+    {
+        "text": "Возврат средств по чеку №123 прошел успешно. Деньги поступят на карту в течение 3 дней",
+        "is_scam": false,
+        "triggers": [],
+        "ml_score": 0.4514,
+        "ml_verdict": "Safe",
+        "reason": "Safe",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:16:50.238511"
+    },
+    {
+        "text": "Напоминание: завтра крайний срок, чтобы перевести деньги за аренду квартиры",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.6883,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:16:39.321936"
+    },
+    {
+        "text": "Заказ №5542 оплачен. Мы переведем деньги продавцу после того, как вы подтвердите получение товара",
+        "is_scam": false,
+        "triggers": [],
+        "ml_score": 0.4448,
+        "ml_verdict": "Safe",
+        "reason": "Safe",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:16:08.731512"
+    },
+    {
+        "text": "Ваш автоплатеж за интернет успешно выполнен. Списано 600 руб.",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.7145,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:15:58.035524"
+    },
+    {
+        "text": "Привет! Переведи, пожалуйста, за обед 450р на Сбер, я за тебя сегодня оплатил.",
+        "is_scam": false,
+        "triggers": [],
+        "ml_score": 0.2292,
+        "ml_verdict": "Safe",
+        "reason": "Safe",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:15:47.298171"
+    },
+    {
+        "text": "Внимание! Ваше устройство заражено вирусом 'Trojan.iOS.Generic'. Требуется немедленная очистка по ссылке",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.9459,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:14:02.449533"
+    },
+    {
+        "text": "Ваша посылка застряла на таможне. Уточните адрес доставки по ссылке: https://pochta-verify-check.com/pay",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.9328,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": true,
+            "suspicious_links": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:13:45.218900"
+    },
+    {
+        "text": "Посмотрите, кажется, на этом фото вы: http://bit.ly/random-link-777",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.8923,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": true,
+            "suspicious_links": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:13:35.824571"
+    },
+    {
+        "text": "Ваша подписка на Premium продлена. Стоимость 2999р/мес. Чтобы отключить, отправьте полученный код нам.",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.6502,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:13:26.750840"
+    },
+    {
+        "text": "Для привязки вашего устройства к системе безопасности, сообщите код из уведомления оператору чата.",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.9695,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:13:15.893908"
+    },
+    {
+        "text": "Обнаружена попытка взлома вашего онлайн-банка. Введите код подтверждения в поле ниже для смены пароля.",
+        "is_scam": true,
+        "triggers": [
+            "код\\s+подтверждения"
+        ],
+        "ml_score": 0.9641,
+        "ml_verdict": "Scam",
+        "reason": "Keyword Trigger",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:13:09.137121"
+    },
+    {
+        "text": "Привет, я участвую в конкурсе, мне не хватает одного голоса! Сейчас придет СМС, скинь мне код, пожалуйста",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.8102,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:13:01.280634"
+    },
+    {
+        "text": "Служба поддержки Telegram: ваш аккаунт будет удален через 24 часа. Чтобы отменить, продиктуйте код от аккаунта нашему боту.",
+        "is_scam": true,
+        "triggers": [
+            "диктуйте",
+            "продиктуйте"
+        ],
+        "ml_score": 0.9615,
+        "ml_verdict": "Scam",
+        "reason": "Keyword Trigger",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:12:53.930732"
+    },
+    {
+        "text": "В ваш аккаунт выполнен вход из г. Владивосток. Если это не вы, пришлите код из SMS в ответ на это сообщение.",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.9788,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:12:40.919967"
+    },
+    {
+        "text": "Инвестируй 1000р сегодня и получи 10 000р уже завтра. Успей перевести деньги до закрытия раунда!",
+        "is_scam": false,
+        "triggers": [],
+        "ml_score": 0.4848,
+        "ml_verdict": "Safe",
+        "reason": "Safe",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:12:24.895101"
+    },
+    {
+        "text": "Мам, я попал в беду, телефон разбит. Срочно переведи 2000р на этот номер, всё объясню позже!",
+        "is_scam": true,
+        "triggers": [
+            "срочно"
+        ],
+        "ml_score": 0.9265,
+        "ml_verdict": "Scam",
+        "reason": "Keyword Trigger",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:10:49.947055"
+    },
+    {
+        "text": "Поздравляем! Вы выиграли в ежегодной лотерее. Чтобы забрать приз, нужно оплатить госпошлину 350 рублей.",
+        "is_scam": false,
+        "triggers": [],
+        "ml_score": 0.2313,
+        "ml_verdict": "Safe",
+        "reason": "Safe",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:10:30.391836"
+    },
+    {
+        "text": "Ваш счет заблокирован из-за подозрительной активности. Чтобы разморозить средства, переведите остаток на резервный счет.",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.9856,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:10:20.184126"
+    },
+    {
+        "text": "Ошибочный перевод! Я случайно отправила вам 5000р, пожалуйста, верните их по номеру +79009559234.",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.6307,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T17:10:09.965668"
+    },
+    {
+        "text": "Вам зачислен перевод 45 000 руб. Для подтверждения получения переведите 500 руб. комиссии на указанный номер.",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.7213,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T16:59:05.166582"
+    },
+    {
+        "text": "Вас взломали срочно переведите деньги на счет 2939 9129 4949 9393",
+        "is_scam": true,
+        "triggers": [
+            "вас\\s+взломали",
+            "срочно"
+        ],
+        "ml_score": 0.5307,
+        "ml_verdict": "Scam",
+        "reason": "Keyword Trigger",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T16:56:42.804207"
+    },
+    {
+        "text": "ФСБ проводит проверку, переведите средства",
+        "is_scam": true,
+        "triggers": [],
+        "ml_score": 0.9582,
+        "ml_verdict": "Scam",
+        "reason": "ML High Confidence",
+        "link_analysis": {
+            "has_links": false,
+            "suspicious": [],
+            "score": 0.0
+        },
+        "timestamp": "2026-01-31T16:23:51.553242"
+    }
+]
