@@ -1,0 +1,13 @@
+2026-02-01 16:53:56 - root - INFO - Logging initialized. Logs directory: C:\Users\iforc\PyCharmMiscProject\kvantorium\big challenges\GuardianAI\logs
+2026-02-01 16:53:56 - root - INFO - ⏳ Инициализация классификатора GuardianAI...
+2026-02-01 16:53:56 - root - INFO - Загрузка RuBERT...
+2026-02-01 16:54:13 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/cointegrated/rubert-tiny2/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-01 16:54:13 - huggingface_hub.utils._http - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-02-01 16:54:23 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/cointegrated/rubert-tiny2/e8ed3b0c8bbf4fb6984c3de043bf7d2f4e5969ae/config.json "HTTP/1.1 200 OK"
+2026-02-01 16:54:23 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/cointegrated/rubert-tiny2/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-01 16:54:40 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/cointegrated/rubert-tiny2/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-02-01 16:54:40 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/cointegrated/rubert-tiny2/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-02-01 16:54:41 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/cointegrated/rubert-tiny2/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-01 16:54:41 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/cointegrated/rubert-tiny2/e8ed3b0c8bbf4fb6984c3de043bf7d2f4e5969ae/config.json "HTTP/1.1 200 OK"
+2026-02-01 16:54:41 - root - INFO - RuBERT (PyTorch) загружен.
+2026-02-01 16:54:41 - root - INFO - ✅ Модель загружена и готова к работе.

@@ -6,37 +6,59 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
-import pickle
 import joblib
+import numpy as np
 
-# Пробуем импортировать transformers
+# Internal modules
+from src.core.patterns import get_compiled_patterns
+from src.core.link_hunter import LinkHunter
+from src.core.whitelist import Whitelist
+from src.core.ner import EntityExtractor
+from src.core.features import FeatureExtractor
+from src.utils.text_processing import clean_text, normalize_homoglyphs
+from src import config
+import logging
+
+# Try importing transformers
 try:
     import torch
     from transformers import AutoTokenizer, AutoModel
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     TRANSFORMERS_AVAILABLE = False
-    print("Transformers не найдены. Используем TF-IDF fallback.")
+    logging.warning("Transformers не найдены. Используем TF-IDF fallback.")
 
-# Импорт ансамблевых моделей
+# Try import ONNX
+try:
+    import onnxruntime as ort
+    ONNX_AVAILABLE = True
+except ImportError:
+    ONNX_AVAILABLE = False
+    logging.warning("ONNX Runtime не найден.")
+
+# Import ensemble models
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, f1_score, precision_score, recall_score, roc_curve
 
 class GuardianClassifier:
-    def __init__(self, model_path="model_hybrid.joblib"):
+    def __init__(self, model_path=None):
         self.regex_patterns = get_compiled_patterns()
         self.link_hunter = LinkHunter()
         self.whitelist = Whitelist()
         self.ner = EntityExtractor()
         self.feature_extractor = FeatureExtractor()
-        self.model_path = model_path
+        self.model_path = model_path if model_path else config.MODEL_PATH
         self.use_bert = TRANSFORMERS_AVAILABLE
+        self.use_onnx = ONNX_AVAILABLE and os.path.exists(config.ONNX_MODEL_PATH)
+        self.threshold = config.SKLEARN_THRESHOLD_DEFAULT # Default, will be updated by calibration
         
         if self.use_bert:
-            # Гибридная модель: RuBERT признаки + Статистические признаки
-            # RandomForest достаточно надежен, чтобы обработать их объединение
+            # Гибридная модель: Признаки RuBERT + Статистические признаки
+            # RandomForest достаточно надежен для их объединения
             self.clf = RandomForestClassifier(n_estimators=100, random_state=42)
             self.tokenizer = None
             self.bert_model = None
+            self.ort_session = None
         else:
             self.ml_pipeline = Pipeline([
                 ('tfidf', TfidfVectorizer(ngram_range=(1, 3), analyzer='char_wb', max_features=5000)),
@@ -50,14 +72,25 @@ class GuardianClassifier:
 
     def _init_bert(self):
         if self.tokenizer is None:
-            print("Загрузка RuBERT...")
+            logging.info("Загрузка RuBERT...")
             model_name = "cointegrated/rubert-tiny2"
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.bert_model = AutoModel.from_pretrained(model_name)
-            # Замораживаем BERT, чтобы использовать как экстрактор признаков
-            for param in self.bert_model.parameters():
-                param.requires_grad = False
-            print("RuBERT загружен.")
+            
+            if self.use_onnx:
+                logging.info(f"Загрузка ONNX модели ({config.ONNX_MODEL_PATH})...")
+                try:
+                    self.ort_session = ort.InferenceSession(config.ONNX_MODEL_PATH)
+                    logging.info("ONNX Runtime готов к работе! 🚀")
+                except Exception as e:
+                    logging.warning(f"Ошибка загрузки ONNX: {e}. Откат к PyTorch.")
+                    self.use_onnx = False
+            
+            if not self.use_onnx:
+                self.bert_model = AutoModel.from_pretrained(model_name)
+                # Заморозка BERT для использования как экстрактора признаков
+                for param in self.bert_model.parameters():
+                    param.requires_grad = False
+                logging.info("RuBERT (PyTorch) загружен.")
 
     def _get_bert_embeddings(self, texts):
         if not self.use_bert:
@@ -65,44 +98,87 @@ class GuardianClassifier:
         self._init_bert()
         
         embeddings = []
-        # Пакетная обработка была бы лучше, но пока простой цикл пойдет для небольшого датасета
+        # Batch processing would be better, but simple loop is fine for small dataset
         for text in texts:
             t = self.tokenizer(text, padding=True, truncation=True, return_tensors='pt', max_length=512)
-            with torch.no_grad():
-                model_output = self.bert_model(**t)
-            # Используем эмбеддинг токена CLS (индекс 0)
-            emb = model_output.last_hidden_state[:, 0, :]
-            embeddings.append(emb[0].numpy())
+            
+            if self.use_onnx:
+                # ONNX Inference
+                ort_inputs = {
+                    'input_ids': t['input_ids'].numpy(),
+                    'attention_mask': t['attention_mask'].numpy()
+                }
+                ort_outs = self.ort_session.run(None, ort_inputs)
+                # Output 0 is last_hidden_state
+                emb = ort_outs[0][:, 0, :] # CLS token equivalent
+                embeddings.append(emb[0])
+            else:
+                # PyTorch Inference
+                with torch.no_grad():
+                    model_output = self.bert_model(**t)
+                # Use CLS token embedding (index 0)
+                emb = model_output.last_hidden_state[:, 0, :]
+                embeddings.append(emb[0].numpy())
+                
         return embeddings
 
     def save_model(self):
         if self.use_bert:
-            joblib.dump(self.clf, self.model_path)
+            # Save classifier and threshold
+            # Joblib dumps the object, so self.threshold (member) is saved if we dump self.clf? 
+            # No, self.clf is just the sklearn object. 
+            # We should save logic to persist threshold.
+            # Ideally we save the whole GuardianClassifier instance, BUT it has non-picklable patterns potentially?
+            # Re.Pattern is picklable in newer python. 
+            # But let's stick to saving the underlying sklearn model to avoid deep refactoring.
+            # We can save threshold in a separate file or hack it into the object if we were dumping self.
+            # For now, let's assume we rely on retraining or hardcode default, OR we save a metadata dict.
+            # Сохраняем словарь с моделью и порогом.
+            state = {
+                'model': self.clf,
+                'threshold': self.threshold
+            }
+            joblib.dump(state, self.model_path)
+            # Примечание: Это меняет формат файла! load_model должна адаптироваться.
         else:
             joblib.dump(self.ml_pipeline, self.model_path)
-        print(f"Модель сохранена в {self.model_path}")
+        logging.info(f"Модель сохранена в {self.model_path}")
         
     def load_model(self):
         try:
+            loaded_obj = joblib.load(self.model_path)
+            
             if self.use_bert:
-                self.clf = joblib.load(self.model_path)
-                # Убедимся, что BERT работает даже после загрузки классификатора
+                if isinstance(loaded_obj, dict) and 'model' in loaded_obj:
+                    self.clf = loaded_obj['model']
+                    self.threshold = loaded_obj.get('threshold', 0.6)
+                else:
+                    # Backward compatibility for old format (just model)
+                    self.clf = loaded_obj
+                    self.threshold = 0.6
+                
+                # Ensure BERT works after loading classifier
                 self._init_bert()
             else:
-                self.ml_pipeline = joblib.load(self.model_path)
+                self.ml_pipeline = loaded_obj
+                
             self.is_trained = True
-            print(f"Модель загружена из {self.model_path}")
+            logging.info(f"Модель загружена из {self.model_path} (Threshold: {self.threshold:.4f})")
         except Exception as e:
-            print(f"Не удалось загрузить модель: {e}")
+            logging.error(f"Не удалось загрузить модель: {e}")
             self.is_trained = False
+            self.threshold = config.SKLEARN_THRESHOLD_DEFAULT # Fallback
 
     def check_keywords(self, text: str) -> list[str]:
         """Возвращает список сработавших паттернов"""
-        matches = []
+        triggers = []
+        # Нормализация перед проверкой ключевых слов
+        text_norm = normalize_homoglyphs(text)
+        
         for pattern in self.regex_patterns:
-            if pattern.search(text):
-                matches.append(pattern.pattern)
-        return matches
+            if pattern.search(text_norm): # Ищем в нормализованном тексте
+                triggers.append(pattern.pattern)
+        return triggers
 
     def check_safe_patterns(self, text: str) -> bool:
         """Проверка на сервисные сообщения (коды, пароли), которые НЕ надо блокировать"""
@@ -126,17 +202,17 @@ class GuardianClassifier:
         scam_files = glob.glob(os.path.join(dataset_path, "scam_*.txt"))
         safe_files = glob.glob(os.path.join(dataset_path, "safe_*.txt"))
         
-        # Пробуем сначала конкретные файлы
+        # Try specific files first
         scam_path = os.path.join(dataset_path, "scam_samples.txt")
         safe_path = os.path.join(dataset_path, "safe_samples.txt")
         
-        # Смешанные датасеты (Пользователь предоставил "phishing_dataset_*.txt")
+        # Mixed datasets (User provided "phishing_dataset_*.txt")
         mixed_files = glob.glob(os.path.join(dataset_path, "phishing_dataset_*.txt"))
         
         data = []
         labels = [] # 1 - scam, 0 - safe
         
-        # Загружаем файлы старого разделения
+        # Load legacy files
         if os.path.exists(scam_path):
             with open(scam_path, 'r', encoding='utf-8') as f:
                 for line in f:
@@ -150,16 +226,16 @@ class GuardianClassifier:
                         data.append(line.strip())
                         labels.append(0)
                         
-        # Загружаем новые смешанные файлы
+        # Load new mixed files
         for m_file in mixed_files:
-            print(f"Загрузка смешанного датасета: {os.path.basename(m_file)}")
+            logging.info(f"Загрузка смешанного датасета: {os.path.basename(m_file)}")
             try:
                 with open(m_file, 'r', encoding='utf-8') as f:
                     for line in f:
                         line = line.strip()
                         if not line: continue
                         
-                        # Формат: 'Scam: "Text"' или 'Safe: "Text"'
+                        # Format: 'Scam: "Text"' or 'Safe: "Text"'
                         if line.startswith("Scam:"):
                             content = line[5:].strip().strip('"')
                             data.append(content)
@@ -169,7 +245,7 @@ class GuardianClassifier:
                             data.append(content)
                             labels.append(0)
             except Exception as e:
-                print(f"Ошибка загрузки {m_file}: {e}")
+                logging.error(f"Ошибка загрузки {m_file}: {e}")
                         
         return data, labels
 
@@ -186,12 +262,12 @@ class GuardianClassifier:
         print(f"Обучение ML модели (BERT={self.use_bert})...")
         
         if self.use_bert:
-            # 1. Эмбеддинги (Семантика)
+            # 1. Embeddings (Семантика)
             print("Генерация эмбеддингов...")
             X_train_emb = self._get_bert_embeddings(X_train)
             X_test_emb = self._get_bert_embeddings(X_test)
             
-            # 2. Статистические признаки (Стилистика)
+            # 2. Statistical features (Стилистика)
             print("Генерация статистических признаков...")
             X_train_stats = np.array([self.feature_extractor.extract(t) for t in X_train])
             X_test_stats = np.array([self.feature_extractor.extract(t) for t in X_test])
@@ -201,23 +277,40 @@ class GuardianClassifier:
             X_test_combined = np.hstack((X_test_emb, X_test_stats))
             
             self.clf.fit(X_train_combined, y_train)
-            predicted = self.clf.predict(X_test_combined)
+            
+            # Оценка (Продвинутые метрики)
+            y_pred_proba = self.clf.predict_proba(X_test_combined)[:, 1]
+            
+            # Авто-калибровка порога (Статистика Юдена)
+            fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+            if len(thresholds) > 0:
+                J = tpr - fpr
+                ix = np.argmax(J)
+                best_thresh = thresholds[ix]
+                print(f"Оптимальный порог (Best Threshold): {best_thresh:.4f}")
+                self.threshold = float(best_thresh) # Save to class
+            
+            # Apply threshold
+            y_pred = (y_pred_proba >= self.threshold).astype(int)
+            
+            print("\n--- ОТЧЕТ О КЛАССИФИКАЦИИ ---")
+            print(classification_report(y_test, y_pred, target_names=['Safe', 'Scam']))
+            print(f"Precision: {precision_score(y_test, y_pred):.4f}")
+            print(f"Recall:    {recall_score(y_test, y_pred):.4f} (Критически важно!)")
+            print(f"F1-Score:  {f1_score(y_test, y_pred):.4f}")
+            print("-------------------------------\n")
+            
         else:
-            # TF-IDF Pipeline expects raw text usually, but we have our own clean_text
-            # Let's clean it here explicitly if we want to match previous behavior
-            # Or assume TfidfVectorizer handles it (it does lowercasing by default)
-            # But our clean_text does extra stuff. Let's map it.
+            # TF-IDF Pipeline
             X_train_clean = [clean_text(t) for t in X_train]
             X_test_clean = [clean_text(t) for t in X_test]
             
             self.ml_pipeline.fit(X_train_clean, y_train)
             predicted = self.ml_pipeline.predict(X_test_clean)
+            print(f"Точность модели (TF-IDF): {metrics.accuracy_score(y_test, predicted):.4f}")
 
         self.is_trained = True
         self.save_model()
-        
-        print(f"Accuracy: {metrics.accuracy_score(y_test, predicted)}")
-        print(metrics.classification_report(y_test, predicted, target_names=['Safe', 'Scam'], zero_division=0))
 
     def predict(self, text: str, strict_mode: bool = False, context: list[str] = None) -> dict:
         # 0. Whitelist check
@@ -232,70 +325,69 @@ class GuardianClassifier:
                 "link_analysis": {"score": 0.0, "has_links": False}
             }
 
-        text_clean = clean_text(text)
+        # Normalize homoglyphs
+        text_norm = normalize_homoglyphs(text)
+        text_clean = clean_text(text_norm)
         
-        # 1. Regex проверка (Триггеры скама) - ТОЛЬКО на текущем тексте
-        triggers = self.check_keywords(text_clean)
+        # 1. Regex check (Scam Triggers) - ONLY on current text
+        triggers = self.check_keywords(text) 
         
-        # 1.1 Проверка безопасных паттернов (OTP, Системные сообщения) - ТОЛЬКО ЕСЛИ НЕ СТРОГИЙ РЕЖИМ
+        # 1.1 Safe Pattern check -- ONLY IF NOT STRICT
         is_safe_pattern = False
         if not strict_mode:
             is_safe_pattern = self.check_safe_patterns(text)
 
-        # 2. ML проверка - Использует Контекст!
+        # 2. ML check - Uses Context!
         ml_score = 0.0
         ml_verdict = "Unknown"
         
-        # Подготовка текста для ML: Контекст + Текущий
+        # Prepare text for ML: Context + Current
         ml_input_text = text_clean
         if context:
-            # Соединяем токеном [SEP], который BERT понимает как разделитель
-            # Очистка контекстных сообщений тоже хорошая практика
-            clean_context = [clean_text(c) for c in context]
+            # Join with [SEP] token
+            clean_context = [clean_text(normalize_homoglyphs(c)) for c in context]
             ml_input_text = " [SEP] ".join(clean_context + [text_clean])
-            # print(f"DEBUG: ML Input with Context: {ml_input_text}") 
         
         if self.is_trained:
             try:
                 if self.use_bert:
                      self._init_bert()
-                     # 1. Эмбеддинги на Контексте + Тексте
+                     # 1. Embeddings on Context + Text
                      text_emb = self._get_bert_embeddings([ml_input_text]) 
                      
-                     # 2. Статистика (Ручные признаки) - Только на ТЕКУЩЕМ тексте
+                     # 2. Statistics (Manual features) - Only on CURRENT text
                      text_stats = self.feature_extractor.extract(text)
                      text_stats = text_stats.reshape(1, -1)
                      
-                     # 3. Объединение
+                     # 3. Combine
                      combined_features = np.hstack((text_emb, text_stats))
                      
                      probs = self.clf.predict_proba(combined_features)[0]
                 else:
                     # TF-IDF
-                    # Примечание: TF-IDF может не обрабатывать [SEP] правильно, но просто будет считать его токеном или проигнорирует.
-                    # Он все равно добавляет 'мешок слов' из истории, что полезно.
                     probs = self.ml_pipeline.predict_proba([ml_input_text])[0]
                 
                 ml_score = probs[1]
             except Exception as e:
-                print(f"Ошибка ML: {e}")
+                logging.error(f"Ошибка ML: {e}")
                 ml_score = 0.0
                 
-            ml_verdict = "Scam" if ml_score > 0.5 else "Safe"
+            # Dynamic threshold usage
+            ml_verdict = "Scam" if ml_score > self.threshold else "Safe"
             
-        # 3. Проверка Link Hunter - ТОЛЬКО на текущем тексте
+        # 3. Link Hunter check
         link_analysis = self.link_hunter.analyze(text)
         link_score = link_analysis['score']
         
-        # Логика финального решения
+        # Final decision logic
         final_score = max(ml_score, link_score)
         
-        # Логика по умолчанию
-        is_scam = bool(bool(triggers) or (ml_score > 0.6) or (link_score > 0.7))
+        # Default logic uses calibrated ML threshold
+        is_scam = bool(bool(triggers) or (ml_score > self.threshold) or (link_score > 0.7))
         reason = "Безопасно"
         
-        # Проверка NER
-        entities = self.ner.extract(text)
+        # NER Check
+        entities = self.ner.extract(text_norm) 
 
         if is_safe_pattern:
             if link_score < 0.8: 
@@ -307,7 +399,7 @@ class GuardianClassifier:
                 reason = "Сработал триггер (Ключевые слова)"
             elif link_score > 0.7:
                  reason = f"Фишинговая ссылка: {', '.join([r['reasons'][0] for r in link_analysis['suspicious_links']])}"
-            elif ml_score > 0.6:
+            elif ml_score > self.threshold:
                 reason = "Высокая уверенность ML"
 
         result = {

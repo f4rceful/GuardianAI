@@ -1,7 +1,8 @@
-import flet as ft
 from src.core.classifier import GuardianClassifier
 from src.core.history import HistoryManager
+from src.core.ocr_engine import OCRExplorer
 import os
+import asyncio
 
 class GuardianApp:
     def __init__(self, page: ft.Page):
@@ -13,6 +14,8 @@ class GuardianApp:
         
         # Инициализация ML мозга
         self.classifier = GuardianClassifier()
+        self.ocr_engine = OCRExplorer()
+        
         if not self.classifier.is_trained:
              print("ВНИМАНИЕ: Модель не найдена. Запустите 'python train.py'!")
         
@@ -21,6 +24,9 @@ class GuardianApp:
         self.current_tab_index = 0
         
         # UI Элементы
+        self.file_picker = ft.FilePicker(on_result=self.on_file_picked)
+        self.page.overlay.append(self.file_picker)
+        
         self.init_components()
         self.load_history_to_ui()
         self.navigate_to_dashboard()
@@ -146,7 +152,11 @@ class GuardianApp:
             content=ft.Column([
                 ft.Text("Симуляция атаки", size=20, weight=ft.FontWeight.BOLD),
                 ft.Text("Введи текст, который якобы пришел на телефон:", color="grey"),
-                ft.Row([self.msg_input, self.send_btn]),
+                ft.Row([
+                    self.msg_input, 
+                    ft.IconButton(icon="camera_alt", tooltip="Скан фото (OCR)", on_click=lambda _: self.file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)),
+                    self.send_btn
+                ]),
                 ft.Divider(),
                 ft.Text("Подсказки для теста:", weight=ft.FontWeight.BOLD),
                 ft.Chip(label="Мам, скинь денег", on_click=lambda e: self.fill_input(e.control.label)),
@@ -259,6 +269,30 @@ class GuardianApp:
             self.page.snack_bar = ft.SnackBar(ft.Text("Сообщение доставлено (Безопасно)"), bgcolor="green")
             self.page.snack_bar.open = True
             self.page.update()
+
+    def on_file_picked(self, e: ft.FilePickerResultEvent):
+        if not e.files or len(e.files) == 0:
+            return
+
+        file_path = e.files[0].path
+        self.page.snack_bar = ft.SnackBar(ft.Text("Распознавание текста... Подождите"), bgcolor="blue")
+        self.page.snack_bar.open = True
+        self.page.update()
+        
+        # Run OCR in background
+        self.page.run_task(self.process_ocr, file_path)
+
+    async def process_ocr(self, file_path):
+        text = await asyncio.to_thread(self.ocr_engine.extract_text, file_path)
+        if text:
+            self.msg_input.value = text
+            self.page.snack_bar = ft.SnackBar(ft.Text("Текст распознан!"), bgcolor="green")
+        else:
+            self.page.snack_bar = ft.SnackBar(ft.Text("Не удалось найти текст."), bgcolor="red")
+        
+        self.page.snack_bar.open = True
+        self.msg_input.update()
+        self.page.update()
 
     def add_message_to_list(self, result):
         # Save to history

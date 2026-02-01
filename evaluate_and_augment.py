@@ -15,7 +15,7 @@ def process_examples():
     new_scams = []
     new_safes = []
     
-    print(f"Reading {input_file}...")
+    print(f"Чтение {input_file}...")
     with open(input_file, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -39,11 +39,11 @@ def process_examples():
             
             status = "✅" if is_scam == expected else "❌"
             if status == "❌":
-                print(f"{status} Failed: {text[:60]}... (Expected: {expected}, Got: {is_scam}, Score: {result['ml_score']:.2f})")
+                print(f"{status} Ошибка: {text[:60]}... (Ожидалось: {expected}, Получено: {is_scam}, Score: {result['ml_score']:.2f})")
 
-    print(f"\n--- Augmentation Summary ---")
-    print(f"New Scam Samples: {len(new_scams)}")
-    print(f"New Safe Samples: {len(new_safes)}")
+    print(f"\n--- Итоги аугментации ---")
+    print(f"Новых примеров Scam: {len(new_scams)}")
+    print(f"Новых примеров Safe: {len(new_safes)}")
     
     # Append to dataset
     with open(scam_file, "a", encoding="utf-8") as f:
@@ -54,7 +54,7 @@ def process_examples():
         for s in new_safes:
             f.write(f"\n{s}")
             
-    print("Dataset updated successfully.")
+    print("Датасет успешно обновлен.")
 
 if __name__ == "__main__":
     process_examples()

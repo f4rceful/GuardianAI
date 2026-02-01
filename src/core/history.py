@@ -1,10 +1,11 @@
 import json
 import os
 from datetime import datetime
+from src import config
 
 class HistoryManager:
-    def __init__(self, filepath="history.json"):
-        self.filepath = filepath
+    def __init__(self, filepath=None):
+        self.filepath = filepath if filepath else config.HISTORY_FILE
         self.history = self.load_history()
 
     def load_history(self):

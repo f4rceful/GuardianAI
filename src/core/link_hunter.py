@@ -72,6 +72,6 @@ class LinkHunter:
                  verdict['score'] = 1.0
 
         except Exception as e:
-            print(f"Error analyzing URL {url}: {e}")
+            print(f"Ошибка анализа URL {url}: {e}")
             
         return verdict

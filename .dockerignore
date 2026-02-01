@@ -1,0 +1,20 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.idea/
+.vscode/
+.git/
+.gitignore
+*.log
+dataset/phishing_dataset_*.txt # Exclude massive datasets if not needed (optional)
+# We might want to keep models if we don't want to retrain inside docker
+# But usually we copy everything.
+# rubert_tiny2.onnx
+# model_hybrid.joblib
