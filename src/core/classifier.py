@@ -14,8 +14,10 @@ from src.core.patterns import get_compiled_patterns
 from src.core.link_hunter import LinkHunter
 from src.core.whitelist import Whitelist
 from src.core.ner import EntityExtractor
+from src.core.ner import EntityExtractor
 from src.core.features import FeatureExtractor
-from src.utils.text_processing import clean_text, normalize_homoglyphs
+from src.core.sentiment import SentimentAnalyzer
+from src.utils.text_processing import clean_text, normalize_homoglyphs, generate_homoglyphs
 from src import config
 import logging
 
@@ -39,6 +41,7 @@ except ImportError:
 # Import ensemble models
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, f1_score, precision_score, recall_score, roc_curve
+from src.core.explainer import ExplainabilityEngine
 
 class GuardianClassifier:
     def __init__(self, model_path=None):
@@ -47,10 +50,14 @@ class GuardianClassifier:
         self.whitelist = Whitelist()
         self.ner = EntityExtractor()
         self.feature_extractor = FeatureExtractor()
+        self.sentiment = SentimentAnalyzer()
         self.model_path = model_path if model_path else config.MODEL_PATH
         self.use_bert = TRANSFORMERS_AVAILABLE
         self.use_onnx = ONNX_AVAILABLE and os.path.exists(config.ONNX_MODEL_PATH)
         self.threshold = config.SKLEARN_THRESHOLD_DEFAULT # Default, will be updated by calibration
+        
+        # Init Explainer (passes self to it)
+        self.explainer = ExplainabilityEngine(self)
         
         if self.use_bert:
             # Гибридная модель: Признаки RuBERT + Статистические признаки
@@ -212,19 +219,49 @@ class GuardianClassifier:
         data = []
         labels = [] # 1 - scam, 0 - safe
         
-        # Load legacy files
-        if os.path.exists(scam_path):
-            with open(scam_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if line.strip():
-                        data.append(line.strip())
-                        labels.append(1)
-        if os.path.exists(safe_path):
-            with open(safe_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if line.strip():
-                        data.append(line.strip())
-                        labels.append(0)
+        # Load specific class files (scam_*.txt)
+        for f_path in scam_files:
+            base_name = os.path.basename(f_path)
+            logging.info(f"Загрузка Scam датасета: {base_name}")
+            
+            # OVERSAMPLING to fix class imbalance / force learning
+            multiplier = 1
+            if "enrichment" in base_name or "samples" in base_name:
+                multiplier = 50 
+                logging.info(f"  -> Применен буст x{multiplier}")
+
+            try:
+                with open(f_path, 'r', encoding='utf-8') as f:
+                    file_lines = f.readlines()
+                    for _ in range(multiplier):
+                        for line in file_lines:
+                            if line.strip():
+                                data.append(line.strip())
+                                labels.append(1)
+            except Exception as e:
+                logging.error(f"Ошибка загрузки {f_path}: {e}")
+
+        # Load specific class files (safe_*.txt)
+        for f_path in safe_files:
+            base_name = os.path.basename(f_path)
+            logging.info(f"Загрузка Safe датасета: {base_name}")
+            
+            # OVERSAMPLING safe examples too
+            multiplier = 1
+            if "enrichment" in base_name or "samples" in base_name:
+                multiplier = 50
+                logging.info(f"  -> Применен буст x{multiplier}")
+
+            try:
+                with open(f_path, 'r', encoding='utf-8') as f:
+                    file_lines = f.readlines()
+                    for _ in range(multiplier):
+                        for line in file_lines:
+                            if line.strip():
+                                data.append(line.strip())
+                                labels.append(0)
+            except Exception as e:
+                logging.error(f"Ошибка загрузки {f_path}: {e}")
                         
         # Load new mixed files
         for m_file in mixed_files:
@@ -259,6 +296,26 @@ class GuardianClassifier:
         print(f"Размер датасета: {len(X)} примеров")
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
+        # --- ADVERSARIAL TRAINING (AUGMENTATION) ---
+        print("Аугментация данных (Homoglyphs)...")
+        aug_X = []
+        aug_y = []
+        for txt, lbl in zip(X_train, y_train):
+            if lbl == 1: # Только для SCAM
+                # Генерируем с вероятностью 50%
+                import random
+                if random.random() < 0.5:
+                    spoofed = generate_homoglyphs(txt)
+                    if spoofed != txt:
+                        aug_X.append(spoofed)
+                        aug_y.append(1)
+        
+        if aug_X:
+            print(f"Добавлено {len(aug_X)} примеров с гомоглифами.")
+            X_train.extend(aug_X)
+            y_train.extend(aug_y)
+        # ---------------------------------------------
+        
         print(f"Обучение ML модели (BERT={self.use_bert})...")
         
         if self.use_bert:
@@ -268,13 +325,28 @@ class GuardianClassifier:
             X_test_emb = self._get_bert_embeddings(X_test)
             
             # 2. Statistical features (Стилистика)
+            # 2. Statistical features (Стилистика)
             print("Генерация статистических признаков...")
             X_train_stats = np.array([self.feature_extractor.extract(t) for t in X_train])
             X_test_stats = np.array([self.feature_extractor.extract(t) for t in X_test])
             
-            # 3. Объединение: [Batch, 312] + [Batch, 5] -> [Batch, 317]
-            X_train_combined = np.hstack((X_train_emb, X_train_stats))
-            X_test_combined = np.hstack((X_test_emb, X_test_stats))
+            # 3. Sentiment Analysis (Эмоции)
+            print("Анализ эмоций (может занять время)...")
+            def get_sent(texts):
+                res = []
+                for i, t in enumerate(texts):
+                    if i % 1000 == 0 and i > 0: print(f"  Processed {i}/{len(texts)}")
+                    s = self.sentiment.analyze(t)
+                    res.append([s['negative'], s['neutral'], s['positive']])
+                return np.array(res)
+
+            X_train_sent = get_sent(X_train)
+            X_test_sent = get_sent(X_test)
+
+            # 4. Объединение: Embeddings + Stats + Sentiment
+            print("Объединение признаков...")
+            X_train_combined = np.hstack((X_train_emb, X_train_stats, X_train_sent))
+            X_test_combined = np.hstack((X_test_emb, X_test_stats, X_test_sent))
             
             self.clf.fit(X_train_combined, y_train)
             
@@ -359,8 +431,12 @@ class GuardianClassifier:
                      text_stats = self.feature_extractor.extract(text)
                      text_stats = text_stats.reshape(1, -1)
                      
-                     # 3. Combine
-                     combined_features = np.hstack((text_emb, text_stats))
+                     # 3. Sentiment
+                     sent = self.sentiment.analyze(text)
+                     text_sent = np.array([[sent['negative'], sent['neutral'], sent['positive']]])
+
+                     # 4. Combine
+                     combined_features = np.hstack((text_emb, text_stats, text_sent))
                      
                      probs = self.clf.predict_proba(combined_features)[0]
                 else:
@@ -387,7 +463,20 @@ class GuardianClassifier:
         reason = "Безопасно"
         
         # NER Check
-        entities = self.ner.extract(text_norm) 
+        entities = self.ner.extract(text_norm)
+        
+        # --- NER Heuristics ---
+        # 1. Fake Authority / Impersonation (MVD, FSB + Urgency/Money)
+        risky_orgs = ['МВД', 'ФСБ', 'Полиция', 'Центробанк', 'Госуслуги', 'Следственный комитет']
+        found_risky_org = [org for org in entities.get('ORG', []) if any(r.lower() in org.lower() for r in risky_orgs)]
+        
+        if found_risky_org:
+            # If Authority is mentioned, we need Urgency or Sensitive info to call it scam
+            if entities.get('URGENCY') or entities.get('SENSITIVE') or "перевод" in text_norm.lower():
+                is_scam = True
+                reason = f"Подозрительная активность от имени организации: {found_risky_org[0]}"
+                # Force high score for UI
+                final_score = max(final_score, 0.95)
 
         if is_safe_pattern:
             if link_score < 0.8: 
@@ -395,12 +484,19 @@ class GuardianClassifier:
                 reason = "Безопасно (Системное сообщение)"
         
         if is_scam:
-            if triggers:
+            if found_risky_org and "Подозрительная активность" in reason:
+                 pass # Reason already set
+            elif triggers:
                 reason = "Сработал триггер (Ключевые слова)"
             elif link_score > 0.7:
                  reason = f"Фишинговая ссылка: {', '.join([r['reasons'][0] for r in link_analysis['suspicious_links']])}"
             elif ml_score > self.threshold:
                 reason = "Высокая уверенность ML"
+
+        # Explainability (Only if not strict to avoid infinite loops)
+        explanation = []
+        if not strict_mode: 
+            explanation = self.explainer.explain(text, final_score, triggers, entities)
 
         result = {
             "text": text,
@@ -410,7 +506,8 @@ class GuardianClassifier:
             "ml_verdict": ml_verdict,
             "reason": reason,
             "link_analysis": link_analysis,
-            "entities": entities
+            "entities": entities,
+            "explanation": explanation
         }
         return result
 

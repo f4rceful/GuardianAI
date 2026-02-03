@@ -1,43 +1,70 @@
 import re
+from natasha import (
+    Segmenter,
+    MorphVocab,
+    NewsEmbedding,
+    NewsNERTagger,
+    Doc
+)
 
 class EntityExtractor:
     def __init__(self):
-        self.entities = {
-            "AUTHORITY": [
-                r"мвд", r"фсб", r"полиция", r"следственный комитет", 
-                r"центробанк", r"цб рф", r"госуслуги", r"налоговая", r"суд"
-            ],
-            "RELATIVE": [
-                r"мам[а-я]*", r"пап[а-я]*", r"бабушк[а-я]*", r"сыно[к-я]*", 
-                r"доч[ь-я]*", r"внук", r"внучк[а-я]*", r"друг", r"подруг[а-я]*"
-            ],
-            "FINANCE": [
-                r"сбер", r"тинькофф", r"в тб", r"альфа", r"банк", 
-                r"счет[а-у]", r"карт[а-ы]", r"кредит", r"займ"
-            ],
+        # 1. Initialize Natasha (Heavy ML)
+        self.segmenter = Segmenter()
+        self.morph_vocab = MorphVocab()
+        self.emb = NewsEmbedding()
+        self.ner_tagger = NewsNERTagger(self.emb)
+        
+        # 2. Custom Regex (Lightweight rules for things Natasha doesn't see)
+        self.custom_patterns = {
             "URGENCY": [
                 r"срочно", r"быстро", r"немедленно", r"сейчас", 
                 r"в течение", r"истекает", r"через час"
             ],
             "SENSITIVE": [
                 r"код", r"пароль", r"cvv", r"cvc", r"пин", r"логин",
-                r"паспорт", r"снилс"
+                r"паспорт", r"снилс", r"госуслуги", r"реквизиты"
+            ],
+            "RELATIVES": [
+                 r"мам[а-я]*", r"пап[а-я]*", r"бабушк[а-я]*", r"сыно[к-я]*", 
+                 r"доч[ь-я]*", r"внук", r"внучк[а-я]*"
             ]
         }
     
     def extract(self, text: str) -> dict:
-        text_lower = text.lower()
-        found = {}
+        found = {
+            "PER": [],
+            "ORG": [],
+            "LOC": [],
+            "URGENCY": [],
+            "SENSITIVE": [],
+            "RELATIVES": []
+        }
         
-        for entity_type, patterns in self.entities.items():
+        # --- 1. Natasha Extraction ---
+        doc = Doc(text)
+        doc.segment(self.segmenter)
+        doc.tag_ner(self.ner_tagger)
+        
+        for span in doc.spans:
+            span.normalize(self.morph_vocab)
+            if span.type in found:
+                found[span.type].append(span.normal)
+
+        # Remove duplicates
+        for k in ["PER", "ORG", "LOC"]:
+            found[k] = list(set(found[k]))
+            
+        # --- 2. Custom Regex Extraction ---
+        text_lower = text.lower()
+        for entity_type, patterns in self.custom_patterns.items():
             matches = []
             for pattern in patterns:
                 if re.search(pattern, text_lower):
-                    matches.append(pattern.replace(r"[а-я]*", "").replace(r"[а-у]", "")) 
-                    # Упрощенное название совпадения для отображения
+                    matches.append(pattern.replace(r"[а-я]*", ""))
             
             if matches:
-                # Удаляем дубликаты и берем уникальные базовые слова
                 found[entity_type] = list(set([m.replace('\\', '') for m in matches]))
                 
-        return found
+        # Cleanup empty keys
+        return {k: v for k, v in found.items() if v}

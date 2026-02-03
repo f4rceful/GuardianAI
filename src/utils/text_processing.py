@@ -38,3 +38,33 @@ def normalize_homoglyphs(text: str) -> str:
     # Строим таблицу перевода
     table = str.maketrans(homoglyphs)
     return text.translate(table)
+
+def generate_homoglyphs(text: str) -> str:
+    """
+    Создает "испорченный" текст, заменяя кириллицу на похожую латиницу.
+    Используется для Adversarial Training.
+    """
+    # Обратное отображение: Кириллица -> Латиница
+    spoof_map = {
+        'а': 'a', 'А': 'A',
+        'е': 'e', 'Е': 'E',
+        'о': 'o', 'О': 'O',
+        'р': 'p', 'Р': 'P',
+        'с': 'c', 'С': 'C',
+        'х': 'x', 'Х': 'X',
+        'у': 'y', 'У': 'Y',
+        'Т': 'T',
+        'Н': 'H',
+        'К': 'K',
+        'М': 'M',
+        'В': 'B'
+    }
+    
+    chars = list(text)
+    import random
+    
+    for i, char in enumerate(chars):
+        if char in spoof_map and random.random() < 0.3: # Заменяем 30% подходящих букв
+            chars[i] = spoof_map[char]
+            
+    return "".join(chars)

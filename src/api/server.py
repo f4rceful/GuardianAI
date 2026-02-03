@@ -40,10 +40,12 @@ class PredictionResponse(BaseModel):
     score: float
     reason: list[str]
     verdict: str
+    entities: dict
+    explanation: list[dict]
 
 @app.get("/")
 def read_root():
-    return {"status": "active", "service": "GuardianAI", "version": "2.0"}
+    return {"status": "active", "service": "GuardianAI", "version": "2.1"}
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest):
@@ -52,20 +54,25 @@ def predict(request: PredictionRequest):
     
     try:
         # Получение сырого прогноза
-        # predict() возвращает (verdict, score, reason)
+        # predict() возвращает сложный dict с entities и explanation
         result = classifier.predict(request.text, strict_mode=request.strict_mode, context=request.context)
         
         # Распаковка результата
         is_scam = result["is_scam"]
         score = result["ml_score"]
-        reason_list = result["triggers"] if result["triggers"] else [result["reason"]]
         verdict = result["ml_verdict"]
         
+        # Reason logic normalization
+        reason_list = result["triggers"] if result["triggers"] else ([result["reason"]] if isinstance(result["reason"], str) else result["reason"])
+        if isinstance(reason_list, str): reason_list = [reason_list]
+
         return PredictionResponse(
             is_scam=is_scam,
             score=score,
             reason=reason_list,
-            verdict=verdict
+            verdict=verdict,
+            entities=result.get("entities", {}),
+            explanation=result.get("explanation", [])
         )
     except Exception as e:
         logging.error(f"Ошибка во время прогнозирования: {e}", exc_info=True)
