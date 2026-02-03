@@ -35,6 +35,7 @@ res_*.txt
 ner_results.txt
 verification_results.txt
 stress_results.txt
+rubert_tiny2.onnx.data
 
 # IDE
 .idea/

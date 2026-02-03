@@ -1,54 +1,122 @@
-# GuardianAI 🛡️
+# GuardianAI Core 🛡️
 
-**Умный детектор фишинга и скама на базе ИИ**
+**Next-Gen Phishing & Scam Detection Engine**
 
-GuardianAI — это приложение для защиты пользователей от мошеннических сообщений и фишинговых атак. Программа использует гибридный подход, объединяя **Глубокое обучение (RuBERT)**, **Машинное обучение (Random Forest)** и **Эвристический анализ**.
+GuardianAI is an advanced AI backend designed to protect users from social engineering, phishing, and scam attacks. It powers the **GuardianAI Android App** and Desktop clients, providing real-time text analysis with explainable verdicts.
 
-![Статус](https://img.shields.io/badge/Статус-Стабильный-green) ![Python](https://img.shields.io/badge/Python-3.10%2B-blue) ![UI](https://img.shields.io/badge/UI-Flet-orange)
-
-## 🌟 Возможности
-
-* **Искусственный Интеллект (Brain)**: Понимает контекст диалога с помощью `rubert-tiny2` (Трансформер). Точность обнаружения скама в тестах — 99.9%.
-* **Распознавание сущностей (NER)**: Определяет, КТО пишет ("Мама", "Банк") и ЧТО требуют ("Деньги", "Пароль").
-* **Охотник за ссылками (Link Hunter) 🕵️**: Анализирует ссылки на фишинг, скрытые переадресации и подмену доменов (например, `google-security-check.com`).
-* **Контекст диалога**: Помнит историю переписки, чтобы выявлять сложные многоходовые атаки.
-* **Белый список**: Автоматически доверяет известным контактам (опционально).
-
-## 🚀 Установка и запуск
-
-1. **Склонируйте репозиторий**:
-
-    ```bash
-    git clone https://github.com/your-username/GuardianAI.git
-    cd GuardianAI
-    ```
-
-2. **Установите зависимости**:
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-    *Примечание: Требуется PyTorch. Если у вас есть видеокарта (GPU), рекомендуется установить CUDA-версию с pytorch.org.*
-
-3. **Запустите приложение**:
-
-    ```bash
-    python src/ui/main.py
-    ```
-
-## 🛠️ Технологии
-
-* **Interface**: [Flet](https://flet.dev) (Современный UI фреймворк)
-* **ML Core**: PyTorch (RuBERT), Scikit-Learn (RandomForest)
-* **Data**: Уникальный датасет из 60,000+ примеров сообщений (Scam/Safe).
-
-## 📂 Структура проекта
-
-* `src/core`: "Мозг" системы (Классификатор, NER, LinkHunter).
-* `src/ui`: Интерфейс (Окна, визуальные элементы).
-* `dataset/`: Данные для обучения модели.
-* `tests/`: Скрипты проверки и тесты.
+![Status](https://img.shields.io/badge/Status-Production-green) ![Python](https://img.shields.io/badge/Python-3.10%2B-blue) ![API](https://img.shields.io/badge/API-FastAPI-009688) ![Model](https://img.shields.io/badge/Model-RuBERT%20%2B%20ONNX-orange)
 
 ---
-*Разработано для проекта "Большие Вызовы" (Кванториум).*
+
+## 🧠 Key Features
+
+### 1. Hybrid Intelligence Architecture
+
+Unlike simple keyword filters, GuardianAI combines three layers of defense:
+
+* **Deep Learning (RuBERT Tiny2)**: Transformer-based model optimized for Russian language nuance and intent understanding (exported to ONNX for speed).
+* **Machine Learning (Random Forest)**: Analyzes statistical features of the text.
+* **Heuristic Engine**: Regex-based detection for known scam patterns, crypto-wallets, and malicious links.
+
+### 2. Explainable AI (XAI) 💡
+
+The system doesn't just say "SCAM" — it explains **WHY**:
+
+* **Impact Analysis**: Identifies exactly which words triggered the AI (Dynamic Occlusion Test).
+* **Entity Recognition (NER)**: Extracts Organizations ("Sberbank"), Persons ("Mom"), and Money amounts.
+* **Trigger Highlighting**: Visualizes dangerous patterns directly in the text.
+
+### 3. Context Awareness 📱
+
+The engine understands the source of the message. A request to "Update Telegram" is safe if contexts is `["Telegram App"]`, but dangerous if context is `["WhatsApp"]`.
+
+### 4. Smart Link Hunter 🕵️‍♂️
+
+* Detects homoglyphs (fake domains looking like real ones).
+* Checks protocol security (HTTP vs HTTPS).
+* Validates against a verified whitelist of official domains.
+
+---
+
+## 🔌 API Reference
+
+The core runs as a **FastAPI** service.
+
+### `POST /predict`
+
+Analyze a message for scam probability.
+
+**Request:**
+
+```json
+{
+  "text": "Win a prize at http://fake-casino.com!",
+  "strict_mode": false,
+  "context": ["SMS"]
+}
+```
+
+**Response:**
+
+```json
+{
+  "is_scam": true,
+  "score": 0.99,
+  "verdict": "DANGEROUS",
+  "reason": ["⛔ Spam Context Detected", "⚠️ Suspicious Link"],
+  "explanation": [
+    {"word": "casino", "type": "TRIGGER", "impact": 1.0}
+  ]
+}
+```
+
+---
+
+## 🚀 Installation & Setup
+
+### Prerequisites
+
+* Python 3.10+
+* NVIDIA GPU (Optional, recommended for training)
+
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/f4rceful/GuardianAI.git
+cd GuardianAI
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 2. Run the API Server
+
+Start the backend service on port 8000:
+
+```bash
+python src/api/server.py
+```
+
+*The server will automatically load the ONNX model and initialize the pipeline.*
+
+### 3. Run the Desktop UI (Optional)
+
+For testing purposes, you can run the Flet-based dashboard:
+
+```bash
+python src/ui/main.py
+```
+
+---
+
+## 📂 Project Structure
+
+* `src/api`: FastAPI server implementation.
+* `src/core`: Core logic (Classifier, NER, Explainability, Pattern Matching).
+* `models/`: Trained models (ONNX, Joblib).
+* `dataset/`: Training data (Safe/Scam samples).
+* `tests/`: Unit and Stress tests.
+
+---
+
+*Developed for "Big Challenges" (Kvantorium).*
