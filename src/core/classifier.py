@@ -126,22 +126,12 @@ class GuardianClassifier:
 
     def save_model(self):
         if self.use_bert:
-            # Сохранение классификатора и порога
-            # Joblib дампит объект, поэтому self.threshold (член класса) сохранится, если мы дампим self.clf? 
-            # Нет, self.clf - это просто объект sklearn. 
-            # Нам нужно сохранить логику для сохранения порога.
-            # Идеально было бы сохранить весь экземпляр GuardianClassifier, НО он может содержать непиклируемые паттерны.
-            # Re.Pattern пиклируется в новых версиях python. 
-            # Но давайте придерживаться сохранения базовой модели sklearn, чтобы избежать глубокого рефакторинга.
-            # Мы можем сохранить порог в отдельном файле или "взломать" объект, если бы мы дампили self.
-            # Пока что будем считать, что полагаемся на переобучение или жестко заданный дефолт, ИЛИ сохраняем словарь метаданных.
-            # Сохраняем словарь с моделью и порогом.
+            # Сохраняем словарь с моделью и порогом
             state = {
                 'model': self.clf,
                 'threshold': self.threshold
             }
             joblib.dump(state, self.model_path)
-            # Примечание: Это меняет формат файла! load_model должна адаптироваться.
         else:
             joblib.dump(self.ml_pipeline, self.model_path)
         logging.info(f"Модель сохранена в {self.model_path}")
@@ -378,7 +368,7 @@ class GuardianClassifier:
         self.save_model()
 
     def predict(self, text: str, strict_mode: bool = False, context: list[str] = None) -> dict:
-        # 0. Whitelist check
+        # 0. Проверка по белому списку
         if self.whitelist.is_trusted(text):
              return {
                 "text": text,
@@ -390,26 +380,26 @@ class GuardianClassifier:
                 "link_analysis": {"score": 0.0, "has_links": False}
             }
 
-        # Normalize homoglyphs
+        # Нормализация гомоглифов
         text_norm = normalize_homoglyphs(text)
         text_clean = clean_text(text_norm)
         
-        # 1. Regex check (Scam Triggers) - ONLY on current text
+        # 1. Проверка Regex (Триггеры) - только на текущем тексте
         triggers = self.check_keywords(text) 
         
-        # 1.1 Safe Pattern check -- ONLY IF NOT STRICT
+        # 1.1 Проверка безопасных паттернов (если не строгий режим)
         is_safe_pattern = False
         if not strict_mode:
             is_safe_pattern = self.check_safe_patterns(text)
 
-        # 2. ML check - Uses Context!
+        # 2. ML проверка - используется контекст!
         ml_score = 0.0
         ml_verdict = "Unknown"
         
-        # Prepare text for ML: Context + Current
+        # Подготовка текста для ML: Контекст + Текущий
         ml_input_text = text_clean
         if context:
-            # Join with [SEP] token
+            # Объединение через токен [SEP]
             clean_context = [clean_text(normalize_homoglyphs(c)) for c in context]
             ml_input_text = " [SEP] ".join(clean_context + [text_clean])
         
@@ -417,18 +407,18 @@ class GuardianClassifier:
             try:
                 if self.use_bert:
                      self._init_bert()
-                     # 1. Embeddings on Context + Text
+                     # 1. Эмбеддинги на Контексте + Тексте
                      text_emb = self._get_bert_embeddings([ml_input_text]) 
                      
-                     # 2. Statistics (Manual features) - Only on CURRENT text
+                     # 2. Статистика (Ручные признаки) - только на ТЕКУЩЕМ тексте
                      text_stats = self.feature_extractor.extract(text)
                      text_stats = text_stats.reshape(1, -1)
                      
-                     # 3. Sentiment
+                     # 3. Анализ тональности
                      sent = self.sentiment.analyze(text)
                      text_sent = np.array([[sent['negative'], sent['neutral'], sent['positive']]])
 
-                     # 4. Combine
+                     # 4. Объединение признаков
                      combined_features = np.hstack((text_emb, text_stats, text_sent))
                      
                      probs = self.clf.predict_proba(combined_features)[0]
@@ -441,34 +431,34 @@ class GuardianClassifier:
                 logging.error(f"Ошибка ML: {e}")
                 ml_score = 0.0
                 
-            # Dynamic threshold usage
+            # Использование динамического порога
             ml_verdict = "Scam" if ml_score > self.threshold else "Safe"
             
-        # 3. Link Hunter check
+        # 3. Проверка Link Hunter
         link_analysis = self.link_hunter.analyze(text)
         link_score = link_analysis['score']
         
-        # Final decision logic
+        # Логика финального решения
         final_score = max(ml_score, link_score)
         
-        # Default logic uses calibrated ML threshold
+        # Логика по умолчанию использует калиброванный порог ML
         is_scam = bool(bool(triggers) or (ml_score > self.threshold) or (link_score > 0.7))
         reason = "Безопасно"
         
-        # NER Check
+        # Проверка NER
         entities = self.ner.extract(text_norm)
         
-        # --- NER Heuristics ---
-        # 1. Fake Authority / Impersonation (MVD, FSB + Urgency/Money)
+        # --- Эвристики NER ---
+        # 1. Ложный авторитет (МВД, ФСБ + Срочность/Деньги)
         risky_orgs = ['МВД', 'ФСБ', 'Полиция', 'Центробанк', 'Госуслуги', 'Следственный комитет']
         found_risky_org = [org for org in entities.get('ORG', []) if any(r.lower() in org.lower() for r in risky_orgs)]
         
         if found_risky_org:
-            # If Authority is mentioned, we need Urgency or Sensitive info to call it scam
+            # Если упомянут авторитет, нужна срочность или чувствительная информация
             if entities.get('URGENCY') or entities.get('SENSITIVE') or "перевод" in text_norm.lower():
                 is_scam = True
                 reason = f"Подозрительная активность от имени организации: {found_risky_org[0]}"
-                # Force high score for UI
+                # Принудительно высокий балл для UI
                 final_score = max(final_score, 0.95)
 
         if is_safe_pattern:
@@ -478,7 +468,7 @@ class GuardianClassifier:
         
         if is_scam:
             if found_risky_org and "Подозрительная активность" in reason:
-                 pass # Reason already set
+                 pass # Причина уже установлена
             elif triggers:
                 reason = "Сработал триггер (Ключевые слова)"
             elif link_score > 0.7:
@@ -486,7 +476,7 @@ class GuardianClassifier:
             elif ml_score > self.threshold:
                 reason = "Высокая уверенность ML"
 
-        # Explainability (Only if not strict to avoid infinite loops)
+        # Объяснимость (только если не строгий режим)
         explanation = []
         if not strict_mode: 
             explanation = self.explainer.explain(text, final_score, triggers, entities)
@@ -505,5 +495,5 @@ class GuardianClassifier:
         return result
 
     async def predict_async(self, text: str, strict_mode: bool = False, context: list[str] = None) -> dict:
-        """Asynchronous wrapper for predict"""
+        """Асинхронная обертка для predict"""
         return await asyncio.to_thread(self.predict, text, strict_mode, context)
