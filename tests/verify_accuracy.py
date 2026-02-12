@@ -4,12 +4,12 @@ import os
 def check_examples():
     clf = GuardianClassifier()
     if not clf.is_trained:
-        print("Model not trained!")
+        print("Модель не обучена!")
         return
 
     file_path = "exampels.txt"
     if not os.path.exists(file_path):
-        print("exampels.txt not found!")
+        print("Файл exampels.txt не найден!")
         return
         
     total = 0
@@ -17,25 +17,23 @@ def check_examples():
     errors = []
     
     with open(file_path, 'r', encoding='utf-8') as f:
-        print(f"{'EXPECTED':<10} | {'PREDICTED':<10} | {'TEXT'}")
+        print(f"{'ОЖИДАЛОСЬ':<10} | {'ПОЛУЧЕНО':<10} | {'ТЕКСТ'}")
         print("-" * 80)
         
         for line in f:
             line = line.strip()
             if not line: continue
             
-            # Parse line "Type: "Text""
+            # Парсинг строки "Type: "Text""
             parts = line.split(':', 1)
             if len(parts) < 2: continue
             
-            expected_type = parts[0].strip().upper() # SCAM or SAFE
+            expected_type = parts[0].strip().upper() # SCAM или SAFE
             text = parts[1].strip().strip('"')
             
-            # Predict
+            # Предсказание
             result = clf.predict(text)
-            # predict returns a DICT now, not tuple (is_scam, reason, ...)
-            # Wait, let's check predict method signature again.
-            # Looking at source code lines 323-338... It returns a DICT.
+            # predict возвращает СЛОВАРЬ (DICT), а не кортеж
             is_scam = result.get('is_scam', False)
             predicted_type = "SCAM" if is_scam else "SAFE"
             
@@ -43,21 +41,21 @@ def check_examples():
             if predicted_type == expected_type:
                 correct += 1
             else:
-                reason = result.get('reason', 'Unknown')
-                errors.append(f"Expected: {expected_type}, Got: {predicted_type} | Reason: {reason} | Text: {text}")
+                reason = result.get('reason', 'Неизвестно')
+                errors.append(f"Ожидалось: {expected_type}, Получено: {predicted_type} | Причина: {reason} | Текст: {text}")
 
     print("-" * 80)
-    print(f"Total: {total}")
-    print(f"Correct: {correct}")
+    print(f"Всего: {total}")
+    print(f"Правильно: {correct}")
     if total > 0:
-        print(f"Accuracy: {correct/total*100:.2f}%")
+        print(f"Точность (Accuracy): {correct/total*100:.2f}%")
     
     if errors:
-        print("\nERRORS (Не прошли проверку):")
+        print("\nОШИБКИ (Не прошли проверку):")
         for err in errors:
             print(err)
     else:
-        print("\nAll examples passed successfully! 🎉")
+        print("\nВсе примеры прошли проверку успешно! 🎉")
 
 if __name__ == "__main__":
     check_examples()

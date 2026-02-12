@@ -3,7 +3,7 @@ import sys
 import os
 import traceback
 
-# Add project root to path
+# Добавляем корень проекта в путь (path)
 sys.path.append(os.getcwd())
 
 from src.ui.views import GuardianApp
@@ -14,18 +14,18 @@ def main(page: ft.Page):
         app = GuardianApp(page)
         page.update()
     except Exception as e:
-        print(f"CRITICAL ERROR IN MAIN: {e}")
+        print(f"КРИТИЧЕСКАЯ ОШИБКА В MAIN: {e}")
         traceback.print_exc()
-        page.add(ft.Text(f"Error starting app: {e}", color="red"))
+        page.add(ft.Text(f"Ошибка при запуске приложения: {e}", color="red"))
         page.update()
 
 if __name__ == "__main__":
     print("Запуск GuardianAI Web App...")
-    print("Please wait for the browser to open...")
+    print("Пожалуйста, подождите открытия браузера...")
     try:
-        # Try using web browser view
+        # Попытка использования просмотра в веб-браузере
         ft.app(target=main, view=ft.AppView.WEB_BROWSER)
     except Exception as e:
-        print(f"FAILED TO START FLET APP: {e}")
+        print(f"НЕ УДАЛОСЬ ЗАПУСТИТЬ FLET APP: {e}")
         traceback.print_exc()
-    print("App execution finished.")
+    print("Выполнение приложения завершено.")

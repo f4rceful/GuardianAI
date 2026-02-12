@@ -9,40 +9,40 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.core.classifier import GuardianClassifier
 
 def benchmark():
-    print("=== Model Benchmark ===")
+    print("=== Бенчмарк Модели ===")
     
-    # Init classifier (should auto-detect ONNX)
+    # Инициализация классификатора (должен авто-определить ONNX)
     clf = GuardianClassifier()
     if not clf.use_onnx:
-        print("[WARNING] ONNX not detected! Benchmark will run on PyTorch only.")
+        print("[ВНИМАНИЕ] ONNX не обнаружен! Бенчмарк будет запущен только на PyTorch.")
     
-    # Force loading
-    print("Initializing engine...")
+    # Принудительная загрузка
+    print("Инициализация движка...")
     clf._init_bert()
     mode = "ONNX" if clf.use_onnx else "PyTorch"
-    print(f"Active Mode: {mode}")
+    print(f"Активный режим: {mode}")
 
-    # Prepare data
+    # Подготовка данных
     texts = ["Тестовое сообщение для проверки скорости."] * 100
-    print(f"Running inference on {len(texts)} samples...")
+    print(f"Запуск инференса на {len(texts)} примерах...")
     
     start_time = time.time()
-    # Direct embedding call to measure purely model speed
+    # Прямой вызов эмбеддингов для замера чистой скорости модели
     embeddings = clf._get_bert_embeddings(texts)
     end_time = time.time()
     
     duration = end_time - start_time
-    avg_time = (duration / len(texts)) * 1000 # ms
+    avg_time = (duration / len(texts)) * 1000 # мс
     
-    print(f"\nTotal Time: {duration:.4f}s")
-    print(f"Avg Time per sample: {avg_time:.2f}ms")
+    print(f"\nОбщее время: {duration:.4f}s")
+    print(f"Среднее время на пример: {avg_time:.2f}ms")
     
     if avg_time < 50:
-         print(f"🚀 Performance is GREAT (<50ms). {mode} is working well.")
+         print(f"🚀 Производительность ОТЛИЧНАЯ (<50ms). {mode} работает хорошо.")
     elif avg_time < 150:
-         print(f"✅ Performance is GOOD (<150ms).")
+         print(f"✅ Производительность ХОРОШАЯ (<150ms).")
     else:
-         print(f"⚠️ Performance is SLOW (>150ms). Optimization might be needed.")
+         print(f"⚠️ Производительность НИЗКАЯ (>150ms). Требуется оптимизация.")
 
 if __name__ == "__main__":
     benchmark()

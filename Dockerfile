@@ -1,40 +1,40 @@
-# Use official Python runtime as a parent image
+# Используем официальный Python образ (slim версия для уменьшения размера)
 FROM python:3.12-slim-bookworm
 
-# Set environment variables
+# Установка переменных окружения
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Set work directory
+# Установка рабочей директории
 WORKDIR /app
 
-# Install system dependencies
+# Установка системных зависимостей
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies optimization
-# 1. Upgrade pip
+# Установка и оптимизация Python зависимостей
+# 1. Обновление pip
 RUN pip install --upgrade pip
 
-# 2. Install CPU-only Torch (Lighter, ~200MB vs 1GB+)
-# This prevents downloading the massive CUDA version which causes timeouts
+# 2. Установка CPU-версии Torch (Легче, ~200MB против 1GB+ у CUDA)
+# Это предотвращает скачивание огромной версии с CUDA, что часто вызывает таймауты
 RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-# 3. Install other dependencies
+# 3. Установка остальных зависимостей
 COPY requirements.txt .
-# Increase timeout for slow connections
+# Увеличенный таймаут для медленных соединений
 RUN pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
 
-# Copy project files
+# Копирование файлов проекта
 COPY . .
 
-# Expose port
+# Открытие порта
 EXPOSE 8550
 
-# Run the application
+# Запуск приложения
 # CMD ["python", "src/ui/main.py"] 
-# Run the FastAPI server
+# Запуск сервера FastAPI
 CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8550"]

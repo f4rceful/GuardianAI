@@ -51,7 +51,7 @@ class LinkHunter:
             # Проверка 1: IP-адрес вместо домена
             if self.ip_pattern.match(domain):
                 verdict['is_suspicious'] = True
-                verdict['reasons'].append("IP address as domain") # Можно оставить англ технический, или "IP адрес как домен"
+                verdict['reasons'].append("IP-адрес вместо домена")
                 verdict['score'] = 1.0
                 return verdict # Мгновенный красный флаг
                 
@@ -59,7 +59,7 @@ class LinkHunter:
             for tld in self.suspicious_tlds:
                 if domain.endswith(tld):
                     verdict['is_suspicious'] = True
-                    verdict['reasons'].append(f"Suspicious TLD ({tld})")
+                    verdict['reasons'].append(f"Подозрительная доменная зона ({tld})")
                     verdict['score'] = max(verdict['score'], 0.8)
             
             # Проверка 3: Смешанные скрипты (Кириллица + Латиница) - Homograph attack
@@ -68,7 +68,7 @@ class LinkHunter:
             has_cyrillic = bool(re.search(r'[а-я]', domain))
             if has_latin and has_cyrillic:
                  verdict['is_suspicious'] = True
-                 verdict['reasons'].append("Mixed scripts (Homograph attack)")
+                 verdict['reasons'].append("Смешанные символы (Атака гомографов)")
                  verdict['score'] = 1.0
 
         except Exception as e:

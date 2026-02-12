@@ -9,7 +9,6 @@ from sklearn import metrics
 import joblib
 import numpy as np
 
-# Internal modules
 from src.core.patterns import get_compiled_patterns
 from src.core.link_hunter import LinkHunter
 from src.core.whitelist import Whitelist
@@ -21,7 +20,6 @@ from src.utils.text_processing import clean_text, normalize_homoglyphs, generate
 from src import config
 import logging
 
-# Try importing transformers
 try:
     import torch
     from transformers import AutoTokenizer, AutoModel
@@ -30,7 +28,6 @@ except ImportError:
     TRANSFORMERS_AVAILABLE = False
     logging.warning("Transformers не найдены. Используем TF-IDF fallback.")
 
-# Try import ONNX
 try:
     import onnxruntime as ort
     ONNX_AVAILABLE = True
@@ -38,7 +35,6 @@ except ImportError:
     ONNX_AVAILABLE = False
     logging.warning("ONNX Runtime не найден.")
 
-# Import ensemble models
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, f1_score, precision_score, recall_score, roc_curve
 from src.core.explainer import ExplainabilityEngine
@@ -54,14 +50,13 @@ class GuardianClassifier:
         self.model_path = model_path if model_path else config.MODEL_PATH
         self.use_bert = TRANSFORMERS_AVAILABLE
         self.use_onnx = ONNX_AVAILABLE and os.path.exists(config.ONNX_MODEL_PATH)
-        self.threshold = config.SKLEARN_THRESHOLD_DEFAULT # Default, will be updated by calibration
+        self.threshold = config.SKLEARN_THRESHOLD_DEFAULT
         
-        # Init Explainer (passes self to it)
+        # Инициализация модуля объяснений
         self.explainer = ExplainabilityEngine(self)
         
         if self.use_bert:
-            # Гибридная модель: Признаки RuBERT + Статистические признаки
-            # RandomForest достаточно надежен для их объединения
+            # Гибридная модель: BERT + Статистика
             self.clf = RandomForestClassifier(n_estimators=100, random_state=42)
             self.tokenizer = None
             self.bert_model = None
@@ -105,25 +100,25 @@ class GuardianClassifier:
         self._init_bert()
         
         embeddings = []
-        # Batch processing would be better, but simple loop is fine for small dataset
+        # Пакетная обработка была бы лучше, но для небольшого датасета подойдет и цикл
         for text in texts:
             t = self.tokenizer(text, padding=True, truncation=True, return_tensors='pt', max_length=512)
             
             if self.use_onnx:
-                # ONNX Inference
+                # ONNX Inference (Логический вывод через ONNX)
                 ort_inputs = {
                     'input_ids': t['input_ids'].numpy(),
                     'attention_mask': t['attention_mask'].numpy()
                 }
                 ort_outs = self.ort_session.run(None, ort_inputs)
-                # Output 0 is last_hidden_state
-                emb = ort_outs[0][:, 0, :] # CLS token equivalent
+                # Выход 0 - это last_hidden_state
+                emb = ort_outs[0][:, 0, :] # Эквивалент токена CLS
                 embeddings.append(emb[0])
             else:
-                # PyTorch Inference
+                # PyTorch Inference (Логический вывод через PyTorch)
                 with torch.no_grad():
                     model_output = self.bert_model(**t)
-                # Use CLS token embedding (index 0)
+                # Используем эмбеддинг токена CLS (индекс 0)
                 emb = model_output.last_hidden_state[:, 0, :]
                 embeddings.append(emb[0].numpy())
                 
@@ -131,15 +126,15 @@ class GuardianClassifier:
 
     def save_model(self):
         if self.use_bert:
-            # Save classifier and threshold
-            # Joblib dumps the object, so self.threshold (member) is saved if we dump self.clf? 
-            # No, self.clf is just the sklearn object. 
-            # We should save logic to persist threshold.
-            # Ideally we save the whole GuardianClassifier instance, BUT it has non-picklable patterns potentially?
-            # Re.Pattern is picklable in newer python. 
-            # But let's stick to saving the underlying sklearn model to avoid deep refactoring.
-            # We can save threshold in a separate file or hack it into the object if we were dumping self.
-            # For now, let's assume we rely on retraining or hardcode default, OR we save a metadata dict.
+            # Сохранение классификатора и порога
+            # Joblib дампит объект, поэтому self.threshold (член класса) сохранится, если мы дампим self.clf? 
+            # Нет, self.clf - это просто объект sklearn. 
+            # Нам нужно сохранить логику для сохранения порога.
+            # Идеально было бы сохранить весь экземпляр GuardianClassifier, НО он может содержать непиклируемые паттерны.
+            # Re.Pattern пиклируется в новых версиях python. 
+            # Но давайте придерживаться сохранения базовой модели sklearn, чтобы избежать глубокого рефакторинга.
+            # Мы можем сохранить порог в отдельном файле или "взломать" объект, если бы мы дампили self.
+            # Пока что будем считать, что полагаемся на переобучение или жестко заданный дефолт, ИЛИ сохраняем словарь метаданных.
             # Сохраняем словарь с моделью и порогом.
             state = {
                 'model': self.clf,
@@ -160,11 +155,11 @@ class GuardianClassifier:
                     self.clf = loaded_obj['model']
                     self.threshold = loaded_obj.get('threshold', 0.6)
                 else:
-                    # Backward compatibility for old format (just model)
+                    # Обратная совместимость для старого формата (только модель)
                     self.clf = loaded_obj
                     self.threshold = 0.6
                 
-                # Ensure BERT works after loading classifier
+                # Убедимся, что BERT работает после загрузки классификатора
                 self._init_bert()
             else:
                 self.ml_pipeline = loaded_obj
@@ -174,7 +169,7 @@ class GuardianClassifier:
         except Exception as e:
             logging.error(f"Не удалось загрузить модель: {e}")
             self.is_trained = False
-            self.threshold = config.SKLEARN_THRESHOLD_DEFAULT # Fallback
+            self.threshold = config.SKLEARN_THRESHOLD_DEFAULT # Значение по умолчанию (Fallback)
 
     def check_keywords(self, text: str) -> list[str]:
         """Возвращает список сработавших паттернов"""
@@ -209,22 +204,22 @@ class GuardianClassifier:
         scam_files = glob.glob(os.path.join(dataset_path, "scam_*.txt"))
         safe_files = glob.glob(os.path.join(dataset_path, "safe_*.txt"))
         
-        # Try specific files first
+        # Сначала пробуем конкретные файлы
         scam_path = os.path.join(dataset_path, "scam_samples.txt")
         safe_path = os.path.join(dataset_path, "safe_samples.txt")
         
-        # Mixed datasets (User provided "phishing_dataset_*.txt")
+        # Смешанные датасеты (предоставленные пользователем "phishing_dataset_*.txt")
         mixed_files = glob.glob(os.path.join(dataset_path, "phishing_dataset_*.txt"))
         
         data = []
-        labels = [] # 1 - scam, 0 - safe
+        labels = [] # 1 - scam (мошенничество), 0 - safe (безопасно)
         
-        # Load specific class files (scam_*.txt)
+        # Загрузка файлов конкретного класса (scam_*.txt)
         for f_path in scam_files:
             base_name = os.path.basename(f_path)
             logging.info(f"Загрузка Scam датасета: {base_name}")
             
-            # OVERSAMPLING to fix class imbalance / force learning
+            # OVERSAMPLING (Передискретизация) для исправления дисбаланса классов / усиления обучения
             multiplier = 1
             if "enrichment" in base_name or "samples" in base_name:
                 multiplier = 50 
@@ -241,12 +236,12 @@ class GuardianClassifier:
             except Exception as e:
                 logging.error(f"Ошибка загрузки {f_path}: {e}")
 
-        # Load specific class files (safe_*.txt)
+        # Загрузка файлов конкретного класса (safe_*.txt)
         for f_path in safe_files:
             base_name = os.path.basename(f_path)
             logging.info(f"Загрузка Safe датасета: {base_name}")
             
-            # OVERSAMPLING safe examples too
+            # OVERSAMPLING (Передискретизация) безопасных примеров тоже
             multiplier = 1
             if "enrichment" in base_name or "samples" in base_name:
                 multiplier = 50
@@ -263,7 +258,7 @@ class GuardianClassifier:
             except Exception as e:
                 logging.error(f"Ошибка загрузки {f_path}: {e}")
                         
-        # Load new mixed files
+        # Загрузка новых смешанных файлов
         for m_file in mixed_files:
             logging.info(f"Загрузка смешанного датасета: {os.path.basename(m_file)}")
             try:
@@ -272,7 +267,7 @@ class GuardianClassifier:
                         line = line.strip()
                         if not line: continue
                         
-                        # Format: 'Scam: "Text"' or 'Safe: "Text"'
+                        # Формат: 'Scam: "Text"' или 'Safe: "Text"'
                         if line.startswith("Scam:"):
                             content = line[5:].strip().strip('"')
                             data.append(content)
@@ -296,7 +291,7 @@ class GuardianClassifier:
         print(f"Размер датасета: {len(X)} примеров")
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
-        # --- ADVERSARIAL TRAINING (AUGMENTATION) ---
+        # Аугментация данных (Homoglyphs)
         print("Аугментация данных (Homoglyphs)...")
         aug_X = []
         aug_y = []
@@ -314,23 +309,21 @@ class GuardianClassifier:
             print(f"Добавлено {len(aug_X)} примеров с гомоглифами.")
             X_train.extend(aug_X)
             y_train.extend(aug_y)
-        # ---------------------------------------------
         
         print(f"Обучение ML модели (BERT={self.use_bert})...")
         
         if self.use_bert:
-            # 1. Embeddings (Семантика)
+            # Генерация эмбеддингов
             print("Генерация эмбеддингов...")
             X_train_emb = self._get_bert_embeddings(X_train)
             X_test_emb = self._get_bert_embeddings(X_test)
             
-            # 2. Statistical features (Стилистика)
-            # 2. Statistical features (Стилистика)
+            # Генерация статистических признаков
             print("Генерация статистических признаков...")
             X_train_stats = np.array([self.feature_extractor.extract(t) for t in X_train])
             X_test_stats = np.array([self.feature_extractor.extract(t) for t in X_test])
             
-            # 3. Sentiment Analysis (Эмоции)
+            # Анализ эмоций
             print("Анализ эмоций (может занять время)...")
             def get_sent(texts):
                 res = []
@@ -343,26 +336,26 @@ class GuardianClassifier:
             X_train_sent = get_sent(X_train)
             X_test_sent = get_sent(X_test)
 
-            # 4. Объединение: Embeddings + Stats + Sentiment
+            # Объединение признаков
             print("Объединение признаков...")
             X_train_combined = np.hstack((X_train_emb, X_train_stats, X_train_sent))
             X_test_combined = np.hstack((X_test_emb, X_test_stats, X_test_sent))
             
             self.clf.fit(X_train_combined, y_train)
             
-            # Оценка (Продвинутые метрики)
+            # Оценка модели
             y_pred_proba = self.clf.predict_proba(X_test_combined)[:, 1]
             
-            # Авто-калибровка порога (Статистика Юдена)
+            # Авто-калибровка порога
             fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
             if len(thresholds) > 0:
                 J = tpr - fpr
                 ix = np.argmax(J)
                 best_thresh = thresholds[ix]
                 print(f"Оптимальный порог (Best Threshold): {best_thresh:.4f}")
-                self.threshold = float(best_thresh) # Save to class
+                self.threshold = float(best_thresh) # Сохраняем в класс
             
-            # Apply threshold
+            # Применение порога
             y_pred = (y_pred_proba >= self.threshold).astype(int)
             
             print("\n--- ОТЧЕТ О КЛАССИФИКАЦИИ ---")

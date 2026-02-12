@@ -7,9 +7,9 @@ def process_examples():
     safe_file = os.path.join("dataset", "safe_samples.txt")
     
     clf = GuardianClassifier()
-    # Force load existing model
+    # Принудительная загрузка существующей модели
     if not clf.is_trained:
-        print("Model not trained or not found!")
+        print("Модель не обучена или не найдена!")
         return
 
     new_scams = []
@@ -33,7 +33,7 @@ def process_examples():
             else:
                 continue
                 
-            # Test current model
+            # Тестирование текущей модели
             result = clf.predict(text)
             is_scam = result['is_scam']
             
@@ -45,7 +45,7 @@ def process_examples():
     print(f"Новых примеров Scam: {len(new_scams)}")
     print(f"Новых примеров Safe: {len(new_safes)}")
     
-    # Append to dataset
+    # Добавление в датасет
     with open(scam_file, "a", encoding="utf-8") as f:
         for s in new_scams:
             f.write(f"\n{s}")

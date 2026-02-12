@@ -7,36 +7,35 @@ class ExplainabilityEngine:
 
     def explain(self, text: str, initial_score: float, triggers: list, entities: dict) -> dict:
         """
-        Generates an explanation for the scam verdict.
-        Returns a list of 'Highlights' (word, type, impact_score).
+        Генерирует объяснение для вердикта о мошенничестве.
+        Возвращает список 'Highlights' (слово, тип, оценка влияния).
         """
         words = text.split()
         highlights = []
         
-        # 1. Static Highlights (Rules & NER)
-        # We prefer these as they are "Hard" evidence
+        # Статические выделения (Правила и NER)
+        # Мы предпочитаем их, так как это "Твердые" доказательства
         
-        # Highlight Triggers
+        # Выделение триггеров
         for pattern_str in triggers:
-            # Re-compile to find span
+            # Перекомпилируем, чтобы найти спан (интервал)
             try:
                 for match in re.finditer(pattern_str, text, re.IGNORECASE):
                     highlights.append({
                         "span": match.span(),
                         "word": match.group(),
                         "type": "TRIGGER",
-                        "impact": 1.0 # Max impact implication
+                        "impact": 1.0 # Подразумевает максимальное влияние
                     })
             except:
                 pass
 
-        # Highlight Entities (NER)
+        # Выделение сущностей (NER)
         for ent_type, vals in entities.items():
             for val in vals:
-                # Simple string search for the entity value in text
-                # In real app, we'd use span from Natasha, but we passed normalized strings
-                # So we do best-effort search here or pass spans from NER usually
-                start = text.lower().find(val.lower()) # Basic find
+                # Простой поиск строки значения сущности в тексте
+                # В реальном приложении лучше использовать span из NER модели
+                start = text.lower().find(val.lower()) # Базовый поиск
                 if start != -1:
                     highlights.append({
                         "span": (start, start + len(val)),
@@ -45,42 +44,39 @@ class ExplainabilityEngine:
                         "impact": 0.8
                     })
 
-        # 2. Dynamic Impact Analysis (Simplified LIME/Occlusion)
-        # We mask each word and check how much the ML score DROPS.
-        # This identifies words that "fooled" or "convinced" the AI.
+        # Динамический анализ влияния (Упрощенный LIME/Occlusion)
+        # Маскируем каждое слово и проверяем падение ML score
         
-        # Only do this if ML Score is high enough to matter
+        # Делаем это, только если ML Score достаточно высок
         if initial_score > 0.4: 
             base_score = initial_score
             
-            # Optimization: check 3-grams or individual significant words to save time?
-            # For short messages, word-by-word is fine.
-            
+            # Оптимизация: для коротких сообщений пословный перебор приемлем
             clean_words = [w.strip(".,!?:") for w in words]
             
             for i, word in enumerate(clean_words):
                 if len(word) < 3: continue 
                 
-                # Create perturbed text (remove word)
+                # Создаем возмущенный текст (удаляем слово)
                 perturbed_text = text.replace(word, "", 1)
                 
-                # Predict (Fast mode, no extensive checks)
-                res = self.clf.predict(perturbed_text, strict_mode=True) # strict to skip extra checks
+                # Предикт (быстрый режим)
+                res = self.clf.predict(perturbed_text, strict_mode=True)
                 new_score = res['ml_score']
                 
                 drop = base_score - new_score
                 
-                # If removing the word dropped the score significantly (>0.1), it's important
+                # Если удаление слова значительно снизило оценку (>0.1), оно важно
                 if drop > 0.05:
                     highlights.append({
-                        "span": None, # Complex to track span after replace
+                        "span": None, # Сложно отследить спан после замены
                         "word": word,
                         "type": "ML_FACTOR",
                         "impact": round(drop, 3)
                     })
 
-        # Format output
-        # Deduplicate and prioritize
+        # Форматирование вывода
+        # Дедупликация и приоритезация
         unique_highlights = {}
         for h in highlights:
             key = h['word'].lower()
@@ -90,16 +86,16 @@ class ExplainabilityEngine:
         return list(unique_highlights.values())
 
     def visualize(self, text, highlights):
-        """Returns console-friendly visualized text"""
+        """Возвращает визуализированный текст, удобный для консоли"""
         vis_text = text
-        # Sort highlights by length desc to avoid replacing substrings incorrectly
+        # Сортируем выделения по длине (по убыванию), чтобы избежать некорректной замены подстрок
         sorted_h = sorted(highlights, key=lambda x: len(x['word']), reverse=True)
         
         for h in sorted_h:
             word = h['word']
             tag = h['type']
-            # Color codes for console
-            # RED for Trigger, YELLOW for ML, CYAN for NER
+            # Цветовые коды для консоли
+            # КРАСНЫЙ для Триггера, ЖЕЛТЫЙ для ML, ГОЛУБОЙ для NER
             replacement = f"[{word}]"
             
             if "TRIGGER" in tag:

@@ -5,14 +5,13 @@ import os
 import uvicorn
 from contextlib import asynccontextmanager
 
-# Add root to path to import modules
+# Добавляем корень проекта в путь
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from src.core.classifier import GuardianClassifier
 from src import config
 import logging
 
-# Global model instance
 classifier = None
 
 @asynccontextmanager
@@ -22,11 +21,11 @@ async def lifespan(app: FastAPI):
     global classifier
     logging.info("⏳ Инициализация классификатора GuardianAI...")
     classifier = GuardianClassifier()
-    # Принудительная инициализация (загрузка ONNX если есть)
+    # Загрузка ONNX если есть
     classifier._init_bert()
     logging.info("✅ Модель загружена и готова к работе.")
     yield
-    # Очистка ресурсов (если нужно)
+    # Очистка ресурсов
 
 app = FastAPI(title="GuardianAI API", version="2.0", lifespan=lifespan)
 
@@ -53,8 +52,7 @@ def predict(request: PredictionRequest):
         raise HTTPException(status_code=503, detail="Модель не инициализирована")
     
     try:
-        # Получение сырого прогноза
-        # predict() возвращает сложный dict с entities и explanation
+        # Прогноз
         result = classifier.predict(request.text, strict_mode=request.strict_mode, context=request.context)
         
         # Распаковка результата
@@ -62,7 +60,7 @@ def predict(request: PredictionRequest):
         score = result["ml_score"]
         verdict = result["ml_verdict"]
         
-        # Reason logic normalization
+        # Нормализация списка причин
         reason_list = result["triggers"] if result["triggers"] else ([result["reason"]] if isinstance(result["reason"], str) else result["reason"])
         if isinstance(reason_list, str): reason_list = [reason_list]
 
@@ -80,7 +78,7 @@ def predict(request: PredictionRequest):
 
 class FeedbackRequest(BaseModel):
     text: str
-    is_scam_report: bool # True если пользователь говорит что это СПАМ, False если НЕ СПАМ
+    is_scam_report: bool # True = СПАМ, False = НЕ СПАМ
     original_score: float = 0.0
 
 @app.post("/feedback")
@@ -88,10 +86,10 @@ def submit_feedback(request: FeedbackRequest):
     try:
         feedback_file = config.FEEDBACK_FILE
         
-        # Создание директории если нет (уже делается в config, но для надежности)
+        # Создание директории
         os.makedirs(os.path.dirname(feedback_file), exist_ok=True)
         
-        # Проверка существования файла для записи заголовка
+        # Проверка существования файла
         file_exists = os.path.isfile(feedback_file)
         
         with open(feedback_file, 'a', encoding='utf-8') as f:

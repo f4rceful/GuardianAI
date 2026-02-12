@@ -36,24 +36,24 @@ class GuardianApp:
             self.add_message_to_list_ui_only(entry)
 
     def add_message_to_list_ui_only(self, result):
-        # Reuse logic for UI tile creation without saving to history again
+        # Повторное использование логики создания плитки UI без повторного сохранения в историю
         score = result.get('ml_score', 0)
         is_scam = result.get('is_scam', False)
         
         if is_scam:
             icon = "dangerous"
             color = "red"
-            verdict = "DANGER"
+            verdict = "ОПАСНО"
             bgcolor = "red50"
         elif score > 0.4:
             icon = "warning"
             color = "orange"
-            verdict = "SUSPICIOUS"
+            verdict = "ПОДОЗРИТЕЛЬНО"
             bgcolor = "orange50"
         else:
             icon = "check_circle"
             color = "green"
-            verdict = "SAFE"
+            verdict = "БЕЗОПАСНО"
             bgcolor = "green50"
             
         tile = ft.Container(
@@ -61,7 +61,7 @@ class GuardianApp:
                 ft.Icon(icon, color=color, size=30),
                 ft.Column([
                     ft.Text(result['text'], max_lines=2, overflow=ft.TextOverflow.ELLIPSIS, weight=ft.FontWeight.BOLD),
-                    ft.Text(f"{verdict} • Confidence: {score:.0%}", color=color, size=12)
+                    ft.Text(f"{verdict} • Уверенность: {score:.0%}", color=color, size=12)
                 ], expand=True),
                 ft.Row([
                      ft.Container(content=ft.Icon("verified_user", color="green"), tooltip="В белый список", on_click=lambda e, t=result['text']: self.add_to_whitelist(t), padding=5),
@@ -77,16 +77,16 @@ class GuardianApp:
 
 
     def init_components(self):
-        # 1. Dashboard Components
+        # Компоненты панели управления (Dashboard)
         self.status_icon = ft.Icon("lock", color="green", size=50)
         self.status_text = ft.Text("Система активна. Мониторинг...", size=20, weight=ft.FontWeight.BOLD)
         self.messages_list = ft.ListView(expand=True, spacing=10, padding=20)
         
-        # 2. Simulation (Control Panel) Components
+        # Компоненты симуляции (Панель управления)
         self.msg_input = ft.TextField(label="Текст сообщения", hint_text="Введите текст для проверки...", expand=True)
         self.send_btn = ft.ElevatedButton("Симуляция входящего SMS", icon="send", on_click=self.on_simulate_message)
         
-        # 3. Alert Components
+        # Компоненты предупреждения (Alert)
         self.alert_msg = ft.Text("", size=18, color="white", italic=True)
         self.alert_reason = ft.Text("", color="yellow", weight=ft.FontWeight.BOLD)
         
@@ -111,9 +111,9 @@ class GuardianApp:
     def navigate_to_dashboard(self):
         self.page.clean()
         
-        # --- Define Views (Content) ---
+        # Определение представлений (Views)
         
-        # Stats
+        # Статистика
         stats = self.history_manager.get_stats()
         self.txt_total = ft.Text(str(stats['total']), size=30, weight=ft.FontWeight.BOLD)
         self.txt_scam = ft.Text(str(stats['scam']), size=30, color="red", weight=ft.FontWeight.BOLD)
@@ -129,7 +129,7 @@ class GuardianApp:
             )
         ])
 
-        # View 1: Grandma's Screen
+        # Экран пользователя (Бабушка-режим)
         self.dashboard_view = ft.Container(
             content=ft.Column([
                 ft.Container(
@@ -147,7 +147,7 @@ class GuardianApp:
             visible=True
         )
         
-        # View 2: Hacker Control Panel
+        # Панель управления хакера (Тестирование)
         self.control_panel_view = ft.Container(
             content=ft.Column([
                 ft.Text("Симуляция атаки", size=20, weight=ft.FontWeight.BOLD),
@@ -167,7 +167,7 @@ class GuardianApp:
             visible=False
         )
 
-        # View 3: Settings
+        # Настройки
         self.settings_view = ft.Container(
             content=ft.Column([
                 ft.Text("Настройки защиты", size=20, weight=ft.FontWeight.BOLD),
@@ -186,13 +186,13 @@ class GuardianApp:
             visible=False
         )
 
-        # Place to hold current body
+        # Контейнер для текущего содержимого
         self.body_container = ft.Container(
             content=ft.Column([self.dashboard_view, self.control_panel_view, self.settings_view]),
             expand=True
         )
 
-        # --- Custom Tab Bar (Using Buttons) ---
+        # Кастомная панель вкладок (Используем кнопки)
         self.tab_btn1 = ft.ElevatedButton("Главная", icon="home", on_click=lambda _: self.set_tab(0), bgcolor="blue", color="white")
         self.tab_btn2 = ft.TextButton("Тест", icon="bug_report", on_click=lambda _: self.set_tab(1))
         self.tab_btn3 = ft.TextButton("Настройки", icon="settings", on_click=lambda _: self.set_tab(2))
@@ -295,10 +295,10 @@ class GuardianApp:
         self.page.update()
 
     def add_message_to_list(self, result):
-        # Save to history
+        # Сохранение в историю
         self.history_manager.add_entry(result)
         
-        # Update Stats UI
+        # Обновление UI статистики
         stats = self.history_manager.get_stats()
         self.txt_total.value = str(stats['total'])
         self.txt_scam.value = str(stats['scam'])
@@ -307,24 +307,24 @@ class GuardianApp:
         
         score = result['ml_score']
         
-        # Visual Severity Logic
+        # Визуальная логика серьезности
         if result['is_scam']:
             icon = "dangerous"
             color = "red"
-            verdict = "DANGER"
+            verdict = "ОПАСНО"
             bgcolor = "red50"
         elif score > 0.4:
             icon = "warning"
             color = "orange"
-            verdict = "SUSPICIOUS"
+            verdict = "ПОДОЗРИТЕЛЬНО"
             bgcolor = "orange50"
         else:
             icon = "check_circle"
             color = "green"
-            verdict = "SAFE"
+            verdict = "БЕЗОПАСНО"
             bgcolor = "green50"
         
-        # Entities Chips
+        # Чипы (Entity Chips)
         entity_controls = []
         if 'entities' in result and result['entities']:
             for cat, items in result['entities'].items():
@@ -348,11 +348,11 @@ class GuardianApp:
                     ft.Text(result['text'], expand=True, weight=ft.FontWeight.BOLD),
                 ], alignment=ft.MainAxisAlignment.START, vertical_alignment=ft.CrossAxisAlignment.START),
                 
-                # Show Entity Chips
+                # Показать чипы сущностей
                 ft.Row(entity_controls, wrap=True) if entity_controls else ft.Container(),
                 
                 ft.Row([
-                    ft.Text(f"{verdict} • Confidence: {score:.0%}", color=color, size=12)
+                    ft.Text(f"{verdict} • Уверенность: {score:.0%}", color=color, size=12)
                 ], expand=True),
                 ft.Row([
                      ft.Container(content=ft.Icon("verified_user", color="green"), tooltip="В белый список", on_click=lambda e: self.add_to_whitelist(result['text']), padding=5),
@@ -377,7 +377,7 @@ class GuardianApp:
     def report_error(self, result):
         try:
              with open("dataset/user_feedback.txt", "a", encoding="utf-8") as f:
-                 # Format: LABEL | TEXT (Label is opposite of prediction)
+                 # Формат: МЕТКА | ТЕКСТ (Метка противоположна предсказанию)
                  correct_label = "SAFE" if result['is_scam'] else "SCAM"
                  f.write(f"{correct_label} | {result['text']}\n")
                  
@@ -385,7 +385,7 @@ class GuardianApp:
              self.page.snack_bar.open = True
              self.page.update()
         except Exception as e:
-            print(f"Error saving feedback: {e}")
+            print(f"Ошибка сохранения отзыва: {e}")
 
     async def show_alert(self, result):
         self.alert_msg.value = f"\"{result['text']}\""

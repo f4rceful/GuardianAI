@@ -24,11 +24,11 @@ class FeatureExtractor:
         digits_ratio = digits_count / text_len
 
         # 4. Наличие URL
-        # Простая проверка, LinkHunter делает детальную проверку, а это для признаков ML
+        # Простая проверка, LinkHunter делает детальную проверку, а это только для ML-признаков
         has_url = 1 if re.search(r'(http|www\.|t\.me|tg:)', text, re.IGNORECASE) else 0
         
         # 5. Длина (очень короткие или очень длинные)
-        # Нормализованная длина (например, до 500 символов)
+        # Нормализованная длина (например, относительно 500 символов)
         norm_len = min(text_len, 500) / 500.0
 
         return np.array([caps_ratio, punct_count, digits_ratio, has_url, norm_len])

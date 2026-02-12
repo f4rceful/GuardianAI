@@ -7,7 +7,7 @@ def fix_threshold():
     
     print(f"Текущий порог: {clf.threshold}")
     
-    # Force set to 0.5
+    # Принудительная установка на 0.5
     new_thresh = 0.5
     clf.threshold = new_thresh
     
